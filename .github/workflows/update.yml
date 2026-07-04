@@ -1,0 +1,41 @@
+name: Update clouds
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # 6時間ごと(UTC)
+  workflow_dispatch:         # 手動実行ボタンも有効化
+
+permissions:
+  contents: write            # リポジトリへのpush権限
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install numpy pillow quicktex
+
+      - name: Generate clouds
+        run: |
+          DATE=$(date -u +%Y%m%d_%H%M)
+          python clouds_pipeline.py test_clouds_eq.jpg . "$DATE"
+
+      - name: Prune old date dirs (keep latest 4)
+        run: |
+          ls -d 20*_* 2>/dev/null | sort | head -n -4 | xargs -r rm -rf
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Auto update clouds $(date -u +%Y-%m-%d_%H:%M)" || echo "no changes"
+          git push
