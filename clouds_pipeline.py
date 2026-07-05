@@ -39,6 +39,13 @@ def render_face(eq, face):
     e = eq.astype(np.float32)
     val = (e[y0, x0] * (1 - wx) * (1 - wy) + e[y0, x1] * wx * (1 - wy)
          + e[y1, x0] * (1 - wx) * wy       + e[y1, x1] * wx * wy)
+    # 極収束: 高緯度ほど、その緯度帯の平均輝度に寄せて放射状アーティファクトを防ぐ
+    abslat = np.abs(lat)
+    t = np.clip((abslat - np.radians(60)) / np.radians(30), 0, 1)  # 60度から極へ0→1
+    if t.max() > 0:
+        # 各行(=各緯度)の平均をブレンド先にする
+        row_mean = val.mean(axis=1, keepdims=True)
+        val = val * (1 - t) + row_mean * t
     return np.clip(val + 0.5, 0, 255).astype(np.uint8)
 
 def patch_header(path):
@@ -65,8 +72,4 @@ def main(src_path, out_dir, date_dir):
     print("all done")
 
 if __name__ == "__main__":
-    from datetime import datetime, timezone
-    src = sys.argv[1] if len(sys.argv) > 1 else "test_clouds_eq.jpg"
-    outdir = sys.argv[2] if len(sys.argv) > 2 else "."
-    date_dir = sys.argv[3] if len(sys.argv) > 3 else datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
-    main(src, outdir, date_dir)
+    main(sys.argv[1], sys.argv[2], sys.argv[3])

@@ -2,40 +2,35 @@ name: Update clouds
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # 6時間ごと(UTC)
-  workflow_dispatch:         # 手動実行ボタンも有効化
+    - cron: '0 */3 * * *'   # 3時間ごと(UTC)
+  workflow_dispatch:
 
 permissions:
-  contents: write            # リポジトリへのpush権限
+  contents: write
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install deps
-        run: pip install numpy pillow quicktex
-
-      - name: Generate clouds
+        run: pip install numpy pillow quicktex netCDF4 scipy
+      - name: Fetch GMGSI and build hybrid clouds
+        run: python make_clouds.py
+      - name: Generate cubemap tiles
         run: |
           DATE=$(date -u +%Y%m%d_%H%M)
-          python clouds_pipeline.py test_clouds_eq.jpg . "$DATE"
-
+          python clouds_pipeline.py clouds_src.png . "$DATE"
+          python -c "import json; json.dump({'baseUrl':'https://hdhsksdhsk.github.io/pixel-clouds/'+'$DATE'+'/'}, open('root.json','w'))"
       - name: Prune old date dirs (keep latest 4)
-        run: |
-          ls -d 20*_* 2>/dev/null | sort | head -n -4 | xargs -r rm -rf
-
+        run: ls -d 20*_* 2>/dev/null | sort | head -n -4 | xargs -r rm -rf
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Auto update clouds $(date -u +%Y-%m-%d_%H:%M)" || echo "no changes"
+          git commit -m "Auto update clouds (GMGSI) $(date -u +%Y-%m-%d_%H:%M)" || echo "no changes"
           git push
