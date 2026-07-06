@@ -2,7 +2,7 @@ name: Update clouds
 
 on:
   schedule:
-    - cron: '0 */3 * * *'   # 3時間ごと(UTC)
+    - cron: '17 */3 * * *'   # 3時間ごと(UTC)
   workflow_dispatch:
 
 permissions:
