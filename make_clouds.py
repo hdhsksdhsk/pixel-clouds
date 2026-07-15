@@ -1,7 +1,7 @@
 """GMGSI最新取得 → LW雲抽出 → Google本家とハイブリッド合成 → equirect出力"""
 import sys, subprocess, urllib.request, numpy as np
 from netCDF4 import Dataset
-from PIL import Image
+from PIL import Image, ImageFilter, ImageEnhance
 from scipy.ndimage import gaussian_filter
 from datetime import datetime, timezone, timedelta
 
@@ -58,7 +58,10 @@ def main():
     w_google = np.clip((LAT - 40) / 15, 0, 1)
     blended = gmgsi_full*(1-w_google) + google_adj*w_google
 
-    Image.fromarray(np.clip(blended,0,255).astype(np.uint8)).save("clouds_src.png")
+    _img = Image.fromarray(np.clip(blended,0,255).astype(np.uint8))
+    _img = _img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=90, threshold=2))
+    _img = ImageEnhance.Contrast(_img).enhance(1.08)
+    _img.save("clouds_src.png")
     print("saved clouds_src.png")
 
 if __name__ == "__main__":
