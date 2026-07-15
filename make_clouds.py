@@ -59,7 +59,6 @@ def main():
     blended = gmgsi_full*(1-w_google) + google_adj*w_google
 
     _img = Image.fromarray(np.clip(blended,0,255).astype(np.uint8))
-    _img = _img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=60, threshold=2))
     _img = ImageEnhance.Contrast(_img).enhance(1.0)
     _img.save("clouds_src.png")
     print("saved clouds_src.png")
