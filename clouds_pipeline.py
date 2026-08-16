@@ -44,8 +44,10 @@ def render_face(eq, face):
     t = np.clip((abslat - np.radians(60)) / np.radians(30), 0, 1)  # 60度から極へ0→1
     if t.max() > 0:
         # 各行(=各緯度)の平均をブレンド先にする
-        row_mean = val.mean(axis=1, keepdims=True)
-        val = val * (1 - t) + row_mean * t
+        from scipy import ndimage as _nd
+        bins = np.clip(((np.degrees(abslat) - 40) / 2).astype(int), 0, 24)
+        means = _nd.mean(val, bins, index=np.arange(25))
+        val = val * (1 - t) + means[bins] * t
     return np.clip(val + 0.5, 0, 255).astype(np.uint8)
 
 def patch_header(path):
