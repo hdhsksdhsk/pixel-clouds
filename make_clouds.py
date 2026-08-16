@@ -55,8 +55,13 @@ def main():
     m_lo, m_hi = np.percentile(gmgsi_full[band], [20, 95])
     google_adj = np.clip((google_eq - g_lo)/(g_hi-g_lo+1e-6)*(m_hi-m_lo)+m_lo, 0, 255)
     LAT = np.tile(np.abs(lat_axis)[:,None], (1, W))
-    w_google = np.clip((LAT - 40) / 15, 0, 1)
-    blended = gmgsi_full*(1-w_google) + google_adj*w_google
+    t = np.clip((LAT - 55) / 17, 0, 1)
+    w_google = t*t*(3 - 2*t)
+    gm_lo = gaussian_filter(gmgsi_full, sigma=12)
+    gg_lo = gaussian_filter(google_adj, sigma=12)
+    base = gm_lo*(1 - w_google) + gg_lo*w_google
+    detail = np.clip((70 - LAT) / 6, 0, 1)
+    blended = base + (gmgsi_full - gm_lo)*detail + (google_adj - gg_lo)*(1 - detail)
 
     _img = Image.fromarray(np.clip(blended,0,255).astype(np.uint8))
     _img = ImageEnhance.Contrast(_img).enhance(1.0)
