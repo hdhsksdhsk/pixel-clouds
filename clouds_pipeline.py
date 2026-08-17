@@ -41,13 +41,17 @@ def render_face(eq, face):
          + e[y1, x0] * (1 - wx) * wy       + e[y1, x1] * wx * wy)
     # 極収束: 高緯度ほど、その緯度帯の平均輝度に寄せて放射状アーティファクトを防ぐ
     abslat = np.abs(lat)
-    t = np.clip((abslat - np.radians(60)) / np.radians(30), 0, 1)  # 60度から極へ0→1
+    t = np.clip((np.degrees(abslat) - 78.0) / 12.0, 0, 1)**2  # 78度から極へ0→1
     if t.max() > 0:
         # 各行(=各緯度)の平均をブレンド先にする
         from scipy import ndimage as _nd
-        bins = np.clip(((np.degrees(abslat) - 40) / 2).astype(int), 0, 24)
-        means = _nd.mean(val, bins, index=np.arange(25))
-        val = val * (1 - t) + means[bins] * t
+        latd = np.degrees(abslat)
+        bins = np.clip(((latd - 40) / 2).astype(int), 0, 24)
+        means = np.asarray(_nd.mean(val, bins, index=np.arange(25)), dtype=float)
+        centers = 41.0 + 2.0*np.arange(25)          # 各ビンの中心緯度
+        ok = np.isfinite(means)
+        prof = np.interp(latd, centers[ok], means[ok])   # 段差を消す連続補間
+        val = val * (1 - t) + prof * t
     return np.clip(val + 0.5, 0, 255).astype(np.uint8)
 
 def patch_header(path):
