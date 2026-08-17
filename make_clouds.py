@@ -83,6 +83,17 @@ def main():
     detail = np.clip((71 - LAT) / 5, 0, 1)
     blended = base + (gmgsi_full - gm_lo)*detail + (google_adj - gg_lo)*(1 - detail)
 
+    POLE_GAIN = 2.0
+    for _hemi in (lat_axis > 0, lat_axis < 0):
+        _ref = blended[(np.abs(lat_axis) >= 66) & (np.abs(lat_axis) < 72) & _hemi]
+        _m0, _s0 = float(_ref.mean()), float(_ref.std())
+        for _y in np.where((np.abs(lat_axis) >= 72) & _hemi)[0]:
+            _w = min((abs(lat_axis[_y]) - 72.0) / 6.0, 1.0)
+            _r = blended[_y]
+            _m1, _s1 = float(_r.mean()), float(_r.std())
+            _g = (1 - _w) + min(_s0 / (_s1 + 1e-6), POLE_GAIN) * _w
+            blended[_y] = (_r - _m1) * _g + (_m1 * (1 - _w) + _m0 * _w)
+
     _img = Image.fromarray(np.clip(blended,0,255).astype(np.uint8))
     _img = ImageEnhance.Contrast(_img).enhance(1.0)
     _img.save("clouds_src.png")

@@ -41,7 +41,7 @@ def render_face(eq, face):
          + e[y1, x0] * (1 - wx) * wy       + e[y1, x1] * wx * wy)
     # 極収束: 高緯度ほど、その緯度帯の平均輝度に寄せて放射状アーティファクトを防ぐ
     abslat = np.abs(lat)
-    t = np.clip((np.degrees(abslat) - 78.0) / 12.0, 0, 1)**2  # 78度から極へ0→1
+    t = np.minimum(np.clip((np.degrees(abslat) - 78.0) / 12.0, 0, 1)**2, 0.5)  # 78度から極へ0→0.5
     if t.max() > 0:
         # 各行(=各緯度)の平均をブレンド先にする
         from scipy import ndimage as _nd
