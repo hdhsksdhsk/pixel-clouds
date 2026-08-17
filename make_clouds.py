@@ -54,13 +54,33 @@ def main():
     g_lo, g_hi = np.percentile(google_eq[band], [20, 95])
     m_lo, m_hi = np.percentile(gmgsi_full[band], [20, 95])
     google_adj = np.clip((google_eq - g_lo)/(g_hi-g_lo+1e-6)*(m_hi-m_lo)+m_lo, 0, 255)
+
+    # 継ぎ目(60-71度)の輝度を半球ごとにGMGSIへ合わせる。暗くする方向のみ適用。
+    seam = (np.abs(lat_axis) >= 60) & (np.abs(lat_axis) <= 71)
+    for hemi in (lat_axis > 0, lat_axis < 0):
+        s = seam & hemi
+        m0, s0 = google_adj[s].mean(), google_adj[s].std()
+        m1, s1 = gmgsi_full[s].mean(), gmgsi_full[s].std()
+        if m1 >= m0:
+            continue
+        g = min(s1/(s0+1e-6), 1.3)
+        r = np.where(hemi)[0]
+        google_adj[r] = (google_adj[r] - m0)*g + m1
+    K = 24.0   # 0付近を滑らかに落としてハードクリップを避ける
+    google_adj = np.where(google_adj >= K, google_adj,
+                          K*np.exp(np.clip((google_adj - K)/K, -30, 0)))
+    google_adj = np.clip(google_adj, 0, 255)
+
     LAT = np.tile(np.abs(lat_axis)[:,None], (1, W))
-    t = np.clip((LAT - 55) / 17, 0, 1)
+    t = np.clip((LAT - 62) / 10, 0, 1)
     w_google = t*t*(3 - 2*t)
-    gm_lo = gaussian_filter(gmgsi_full, sigma=12)
+    # ±72.7度より外のゼロ詰めが滲まないよう、有効マスクで正規化する
+    vmask = np.zeros((H, W), np.float32)
+    vmask[pad:pad+gm.shape[0], :] = 1
+    gm_lo = gaussian_filter(gmgsi_full, sigma=12) / np.maximum(gaussian_filter(vmask, sigma=12), 0.05)
     gg_lo = gaussian_filter(google_adj, sigma=12)
     base = gm_lo*(1 - w_google) + gg_lo*w_google
-    detail = np.clip((70 - LAT) / 6, 0, 1)
+    detail = np.clip((71 - LAT) / 5, 0, 1)
     blended = base + (gmgsi_full - gm_lo)*detail + (google_adj - gg_lo)*(1 - detail)
 
     _img = Image.fromarray(np.clip(blended,0,255).astype(np.uint8))
