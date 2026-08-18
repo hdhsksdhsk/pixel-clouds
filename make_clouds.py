@@ -32,6 +32,18 @@ def main():
 
     ds = Dataset("gmgsi_lw.nc")
     data = np.ma.filled(ds.variables["data"][0].astype(np.float32), 0)
+    dqf = np.ma.filled(ds.variables["dqf"][0].astype(np.int16), 1)
+    valid = (data > 0) & (dqf == 0)
+    print("dqf無効: %.2f%%" % ((~valid).mean()*100))
+    # 無効画素を経度方向の有効画素で内挿して埋める(番兵値255の持ち込み防止)
+    _x = np.arange(data.shape[1], dtype=np.float32)
+    for _i in range(data.shape[0]):
+        _v = valid[_i]
+        _n = int(_v.sum())
+        if _n == 0:
+            data[_i] = 0.0
+        elif _n < data.shape[1]:
+            data[_i] = np.interp(_x, _x[_v], data[_i][_v], period=data.shape[1])
     valid = data > 0
     lo, hi = np.percentile(data[valid], [3, 97])
     norm = np.clip((data - lo)/(hi-lo+1e-6), 0, 1)
