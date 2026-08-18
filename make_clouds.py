@@ -35,16 +35,8 @@ def main():
     dqf = np.ma.filled(ds.variables["dqf"][0].astype(np.int16), 1)
     valid = (data > 0) & (dqf == 0)
     print("dqf無効: %.2f%%" % ((~valid).mean()*100))
-    # 無効画素を経度方向の有効画素で内挿して埋める(番兵値255の持ち込み防止)
-    _x = np.arange(data.shape[1], dtype=np.float32)
-    for _i in range(data.shape[0]):
-        _v = valid[_i]
-        _n = int(_v.sum())
-        if _n == 0:
-            data[_i] = 0.0
-        elif _n < data.shape[1]:
-            data[_i] = np.interp(_x, _x[_v], data[_i][_v], period=data.shape[1])
-    valid = data > 0
+    data = np.where(valid, data, 0.0)
+    gm_valid_raw = valid.astype(np.float32)
     lo, hi = np.percentile(data[valid], [3, 97])
     norm = np.clip((data - lo)/(hi-lo+1e-6), 0, 1)
     cloud = np.power(norm, 1.6) * 255
@@ -53,9 +45,12 @@ def main():
 
     # ±72.7 → 全球へ配置
     gm = np.asarray(Image.fromarray(gm_raw).resize((W, int(H*72.7/90)), Image.LANCZOS), np.float32)
+    gmv = np.asarray(Image.fromarray((gm_valid_raw*255).astype(np.uint8)).resize((W, int(H*72.7/90)), Image.LANCZOS), np.float32)/255.0
     pad = (H - gm.shape[0])//2
     gmgsi_full = np.zeros((H, W), np.float32)
     gmgsi_full[pad:pad+gm.shape[0], :] = gm
+    gm_ok = np.zeros((H, W), np.float32)
+    gm_ok[pad:pad+gm.shape[0], :] = np.clip(gmv, 0, 1)
 
     # Google本家(極域)と輝度マッチング＋ブレンド
     google_eq = np.asarray(Image.open("google_clouds_eq.png").convert("L"), np.float32)
@@ -87,12 +82,11 @@ def main():
     t = np.clip((LAT - 62) / 10, 0, 1)
     w_google = t*t*(3 - 2*t)
     # ±72.7度より外のゼロ詰めが滲まないよう、有効マスクで正規化する
-    vmask = np.zeros((H, W), np.float32)
-    vmask[pad:pad+gm.shape[0], :] = 1
+    vmask = gm_ok.copy()
     gm_lo = gaussian_filter(gmgsi_full, sigma=12) / np.maximum(gaussian_filter(vmask, sigma=12), 0.05)
     gg_lo = gaussian_filter(google_adj, sigma=12)
     base = gm_lo*(1 - w_google) + gg_lo*w_google
-    detail = np.clip((71 - LAT) / 5, 0, 1)
+    detail = np.clip((71 - LAT) / 5, 0, 1) * gm_ok
     blended = base + (gmgsi_full - gm_lo)*detail + (google_adj - gg_lo)*(1 - detail)
 
     POLE_GAIN = 1.0
