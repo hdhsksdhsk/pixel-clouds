@@ -83,7 +83,7 @@ def main():
     detail = np.clip((71 - LAT) / 5, 0, 1)
     blended = base + (gmgsi_full - gm_lo)*detail + (google_adj - gg_lo)*(1 - detail)
 
-    POLE_GAIN = 2.0
+    POLE_GAIN = 1.0
     for _hemi in (lat_axis > 0, lat_axis < 0):
         _ref = blended[(np.abs(lat_axis) >= 66) & (np.abs(lat_axis) < 72) & _hemi]
         _m0, _s0 = float(_ref.mean()), float(_ref.std())
