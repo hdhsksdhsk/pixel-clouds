@@ -25,6 +25,9 @@ def find_latest_lw():
             return keys[-1]
     raise RuntimeError("no GMGSI_LW file found")
 
+from scipy.ndimage import binary_erosion
+
+
 def main():
     key = find_latest_lw()
     print("using:", key)
@@ -35,22 +38,28 @@ def main():
     dqf = np.ma.filled(ds.variables["dqf"][0].astype(np.int16), 1)
     valid = (data > 0) & (dqf == 0)
     print("dqf無効: %.2f%%" % ((~valid).mean()*100))
-    data = np.where(valid, data, 0.0)
+    valid = binary_erosion(valid, np.ones((3, 3), bool), iterations=2)
     gm_valid_raw = valid.astype(np.float32)
     lo, hi = np.percentile(data[valid], [3, 97])
     norm = np.clip((data - lo)/(hi-lo+1e-6), 0, 1)
     cloud = np.power(norm, 1.6) * 255
-    cloud[~valid] = 0
-    gm_raw = np.clip(cloud, 0, 255).astype(np.uint8)
+    NH = int(H * 72.7 / 90)
+
+    def _rs(a):
+        f = Image.fromarray(np.ascontiguousarray(a, np.float32), mode="F")
+        return np.asarray(f.resize((W, NH), Image.LANCZOS), np.float32)
 
     # ±72.7 → 全球へ配置
-    gm = np.asarray(Image.fromarray(gm_raw).resize((W, int(H*72.7/90)), Image.LANCZOS), np.float32)
-    gmv = np.asarray(Image.fromarray((gm_valid_raw*255).astype(np.uint8)).resize((W, int(H*72.7/90)), Image.LANCZOS), np.float32)/255.0
-    pad = (H - gm.shape[0])//2
+    gmv = np.clip(_rs(gm_valid_raw), 0.0, 1.0)
+    gm = np.clip(_rs(cloud * gm_valid_raw) / np.maximum(gmv, 1e-3), 0, 255)
+    pad = (H - NH) // 2
     gmgsi_full = np.zeros((H, W), np.float32)
     gmgsi_full[pad:pad+gm.shape[0], :] = gm
     gm_ok = np.zeros((H, W), np.float32)
     gm_ok[pad:pad+gm.shape[0], :] = np.clip(gmv, 0, 1)
+    gm_ok = (gm_ok > 0.5).astype(np.float32)
+    gm_soft = np.clip(gaussian_filter(gm_ok, sigma=6.0), 0.0, 1.0)
+    gm_soft = gm_soft * gm_soft * (3 - 2 * gm_soft)
 
     # Google本家(極域)と輝度マッチング＋ブレンド
     google_eq = np.asarray(Image.open("google_clouds_eq.png").convert("L"), np.float32)
@@ -85,9 +94,17 @@ def main():
     vmask = gm_ok.copy()
     gm_lo = gaussian_filter(gmgsi_full, sigma=12) / np.maximum(gaussian_filter(vmask, sigma=12), 0.05)
     gg_lo = gaussian_filter(google_adj, sigma=12)
+    gmgsi_full = np.where(gm_ok > 0.5, gmgsi_full, gm_lo)
     base = gm_lo*(1 - w_google) + gg_lo*w_google
-    detail = np.clip((71 - LAT) / 5, 0, 1) * gm_ok
+    detail = np.clip((71 - LAT) / 5, 0, 1) * gm_soft
     blended = base + (gmgsi_full - gm_lo)*detail + (google_adj - gg_lo)*(1 - detail)
+
+    _edge = gaussian_filter(gm_ok, 2)
+    _b = (_edge > 0.02) & (_edge < 0.98)
+    _lap = np.abs(blended - gaussian_filter(blended, 2))
+    if _b.sum() > 100:
+        print("境界の段差比: %.2f  (1.0=段差なし / 2.0超で要注意)"
+              % (np.percentile(_lap[_b], 99) / (np.percentile(_lap, 99) + 1e-6)))
 
     POLE_GAIN = 1.0
     for _hemi in (lat_axis > 0, lat_axis < 0):
