@@ -24,6 +24,7 @@ jobs:
         run: |
           DATE=$(date -u +%Y%m%d_%H%M)
           python clouds_pipeline.py clouds_src.png . "$DATE"
+          python check_seams.py --tiles "$DATE"
           python -c "import json; json.dump({'baseUrl':'https://hdhsksdhsk.github.io/pixel-clouds/'+'$DATE'+'/'}, open('root.json','w'))"
       - name: Prune old date dirs (keep latest 4)
         run: ls -d 20*_* 2>/dev/null | sort | head -n -4 | xargs -r rm -rf

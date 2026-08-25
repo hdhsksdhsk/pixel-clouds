@@ -1,0 +1,12 @@
+.DS_Store
+*.bak*
+*.before_*
+*.orig
+gmgsi_lw.nc
+chk_*.png
+line_*.png
+look_*.png
+face*_full.png
+nx_from_dds.png
+clouds_src_before.png
+test_*/
