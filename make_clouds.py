@@ -1,8 +1,12 @@
 """GMGSI最新取得 → LW雲抽出 → Google本家とハイブリッド合成 → equirect出力"""
-import sys, subprocess, urllib.request, numpy as np
+import os, sys, subprocess, urllib.request, numpy as np
 from netCDF4 import Dataset
 from PIL import Image, ImageFilter, ImageEnhance
 from scipy.ndimage import gaussian_filter
+# --- wrap patch ---
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.expanduser('~/wallpaper-work'))
+from wrap_ops import wrap_resize as _wrap_resize, wrap_gauss as _wrap_gauss, wrap_gap as _wrap_gap, wrap_erosion as _wrap_erosion
 from datetime import datetime, timezone, timedelta
 
 W, H = 2048, 1024
@@ -29,16 +33,19 @@ from scipy.ndimage import binary_erosion
 
 
 def main():
-    key = find_latest_lw()
-    print("using:", key)
-    urllib.request.urlretrieve(f"{BUCKET}/{key}", "gmgsi_lw.nc")
+    if "--no-download" in sys.argv and os.path.exists("gmgsi_lw.nc"):
+        print("using: 既存の gmgsi_lw.nc (--no-download)")   # # --- wrap patch ---
+    else:
+        key = find_latest_lw()
+        print("using:", key)
+        urllib.request.urlretrieve(f"{BUCKET}/{key}", "gmgsi_lw.nc")
 
     ds = Dataset("gmgsi_lw.nc")
     data = np.ma.filled(ds.variables["data"][0].astype(np.float32), 0)
     dqf = np.ma.filled(ds.variables["dqf"][0].astype(np.int16), 1)
     valid = (data > 0) & (dqf == 0)
     print("dqf無効: %.2f%%" % ((~valid).mean()*100))
-    valid = binary_erosion(valid, np.ones((3, 3), bool), iterations=2)
+    valid = _wrap_erosion(valid, np.ones((3, 3), bool), iterations=2)   # --- wrap patch ---
     gm_valid_raw = valid.astype(np.float32)
     lo, hi = np.percentile(data[valid], [3, 97])
     norm = np.clip((data - lo)/(hi-lo+1e-6), 0, 1)
@@ -46,8 +53,7 @@ def main():
     NH = int(H * 72.7 / 90)
 
     def _rs(a):
-        f = Image.fromarray(np.ascontiguousarray(a, np.float32), mode="F")
-        return np.asarray(f.resize((W, NH), Image.LANCZOS), np.float32)
+        return _wrap_resize(a, W, NH)   # # --- wrap patch ---
 
     # ±72.7 → 全球へ配置
     gmv = np.clip(_rs(gm_valid_raw), 0.0, 1.0)
@@ -58,7 +64,7 @@ def main():
     gm_ok = np.zeros((H, W), np.float32)
     gm_ok[pad:pad+gm.shape[0], :] = np.clip(gmv, 0, 1)
     gm_ok = (gm_ok > 0.5).astype(np.float32)
-    gm_soft = np.clip(gaussian_filter(gm_ok, sigma=6.0), 0.0, 1.0)
+    gm_soft = np.clip(_wrap_gauss(gm_ok, sigma=6.0), 0.0, 1.0)
     gm_soft = gm_soft * gm_soft * (3 - 2 * gm_soft)
 
     # Google本家(極域)と輝度マッチング＋ブレンド
@@ -92,16 +98,16 @@ def main():
     w_google = t*t*(3 - 2*t)
     # ±72.7度より外のゼロ詰めが滲まないよう、有効マスクで正規化する
     vmask = gm_ok.copy()
-    gm_lo = gaussian_filter(gmgsi_full, sigma=12) / np.maximum(gaussian_filter(vmask, sigma=12), 0.05)
-    gg_lo = gaussian_filter(google_adj, sigma=12)
+    gm_lo = _wrap_gauss(gmgsi_full, sigma=12) / np.maximum(_wrap_gauss(vmask, sigma=12), 0.05)
+    gg_lo = _wrap_gauss(google_adj, sigma=12)
     gmgsi_full = np.where(gm_ok > 0.5, gmgsi_full, gm_lo)
     base = gm_lo*(1 - w_google) + gg_lo*w_google
     detail = np.clip((71 - LAT) / 5, 0, 1) * gm_soft
     blended = base + (gmgsi_full - gm_lo)*detail + (google_adj - gg_lo)*(1 - detail)
 
-    _edge = gaussian_filter(gm_ok, 2)
+    _edge = _wrap_gauss(gm_ok, 2)
     _b = (_edge > 0.02) & (_edge < 0.98)
-    _lap = np.abs(blended - gaussian_filter(blended, 2))
+    _lap = np.abs(blended - _wrap_gauss(blended, 2))
     if _b.sum() > 100:
         print("境界の段差比: %.2f  (1.0=段差なし / 2.0超で要注意)"
               % (np.percentile(_lap[_b], 99) / (np.percentile(_lap, 99) + 1e-6)))
@@ -121,6 +127,8 @@ def main():
     _img = ImageEnhance.Contrast(_img).enhance(1.0)
     _img.save("clouds_src.png")
     print("saved clouds_src.png")
+    print("東西端の段差比: %.2f  (1.0=段差なし / 1.6超でNG)"
+          % _wrap_gap(np.asarray(_img, np.float32)))   # # --- wrap patch ---
 
 if __name__ == "__main__":
     main()
