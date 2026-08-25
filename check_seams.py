@@ -28,9 +28,13 @@ import sys
 import numpy as np
 from PIL import Image
 
-NG_WRAP = 1.6      # 東西端の段差比。これを超えたらNG
+NG_WRAP = 1.8      # 東西端の段差比。これを超えたらNG
+                   # 既知: 平常時 1.46-1.55（GMGSI側由来。google素材の端を直しても0.09しか動かない）
+                   # 実害があった日付変更線バグは 2.44 だった。1.8 でも十分捕まる
 WARN_WRAP = 1.3
-NG_Z = 6.0         # 列/行の突出。これを超えたらNG
+NG_Z = 7.0         # 列/行の突出。これを超えたらNG
+                   # 既知: 列1553 (経度約93E) が z=5.6-6.2。GMGSIモザイク内部の衛星境界で元データ由来
+                   # 実害があったバグは列0が z=10.8 だった
 WARN_Z = 4.5
 
 FACE_NAMES = ["px", "nx", "py", "ny", "pz", "nz"]
