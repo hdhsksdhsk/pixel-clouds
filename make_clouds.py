@@ -95,7 +95,7 @@ def main():
 
     LAT = np.tile(np.abs(lat_axis)[:,None], (1, W))
     t = np.clip((LAT - 62) / 10, 0, 1)
-    w_google = t*t*(3 - 2*t)
+    w_google = np.maximum(t*t*(3 - 2*t), 1.0 - gm_soft)
     # ±72.7度より外のゼロ詰めが滲まないよう、有効マスクで正規化する
     vmask = gm_ok.copy()
     gm_lo = _wrap_gauss(gmgsi_full, sigma=12) / np.maximum(_wrap_gauss(vmask, sigma=12), 0.05)
