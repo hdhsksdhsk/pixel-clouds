@@ -26,6 +26,15 @@ jobs:
           python clouds_pipeline.py clouds_src.png . "$DATE"
           python check_seams.py --tiles "$DATE"
           python -c "import json; json.dump({'baseUrl':'https://hdhsksdhsk.github.io/pixel-clouds/'+'$DATE'+'/'}, open('root.json','w'))"
+      - name: Archive inputs (for reproduction)
+        uses: actions/upload-artifact@v4
+        with:
+          name: inputs-${{ github.run_id }}
+          path: |
+            gmgsi_lw.nc
+            clouds_src.png
+          retention-days: 14
+          if-no-files-found: warn
       - name: Prune old date dirs (keep latest 4)
         run: ls -d 20*_* 2>/dev/null | sort | head -n -4 | xargs -r rm -rf
       - name: Commit and push
