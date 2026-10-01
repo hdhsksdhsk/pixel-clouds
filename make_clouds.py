@@ -123,6 +123,16 @@ def main():
             _g = (1 - _w) + min(_s0 / (_s1 + 1e-6), POLE_GAIN) * _w
             blended[_y] = (_r - _m1) * _g + (_m1 * (1 - _w) + _m0 * _w)
 
+    if "--polar" in sys.argv:   # --- polar patch ---
+        try:   # --- polar patch ---
+            import polar_fill   # --- polar patch ---
+            _before = blended.copy()   # --- polar patch ---
+            blended = polar_fill.apply(blended, lat_axis, reuse=("--no-download" in sys.argv))   # --- polar patch ---
+            if "--polar-debug" in sys.argv:   # --- polar patch ---
+                polar_fill.save_compare(_before, blended)   # --- polar patch ---
+                print("polar: polar_compare.png を保存")   # --- polar patch ---
+        except Exception as _e:   # --- polar patch ---
+            print("polar: スキップ（今まで通りの絵を使う）:", _e)   # --- polar patch ---
     _img = Image.fromarray(np.clip(blended,0,255).astype(np.uint8))
     _img = ImageEnhance.Contrast(_img).enhance(1.0)
     _img.save("clouds_src.png")

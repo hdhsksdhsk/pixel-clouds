@@ -19,7 +19,7 @@ jobs:
       - name: Install deps
         run: pip install numpy pillow quicktex netCDF4 scipy
       - name: Fetch GMGSI and build hybrid clouds
-        run: python make_clouds.py
+        run: python make_clouds.py --polar
       - name: Generate cubemap tiles
         run: |
           DATE=$(date -u +%Y%m%d_%H%M)
@@ -34,6 +34,7 @@ jobs:
           path: |
             gmgsi_lw.nc
             clouds_src.png
+            polar_K.npy
           retention-days: 14
           if-no-files-found: warn
       - name: Prune old date dirs (keep latest 4)

@@ -11,3 +11,5 @@ nx_from_dds.png
 clouds_src_before.png
 test_*/
 clouds_src.png
+polar_K.npy
+polar_compare.png
