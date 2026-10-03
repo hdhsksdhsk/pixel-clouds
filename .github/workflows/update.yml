@@ -20,6 +20,14 @@ jobs:
         run: pip install numpy pillow quicktex netCDF4 scipy
       - name: Fetch GMGSI and build hybrid clouds
         run: python make_clouds.py --polar
+      # --- him/match patch ---
+      - name: Fix 93E satellite seam with Himawari (skips itself on failure)
+        run: |
+          cp clouds_src.png /tmp/clouds_src_raw.png
+          python himawari_seam.py clouds_src.png clouds_src.png --nc gmgsi_lw.nc --zmax 88 --latmax 66 --lattaper 4 --cache /tmp/himawari
+      - name: Match cloud look to built-in clouds
+        run: python cloud_match.py clouds_src.png clouds_src.png || echo "::warning::cloud_match failed - raw clouds used"
+      # --- him/match patch end ---
       - name: Generate cubemap tiles
         run: |
           DATE=$(date -u +%Y%m%d_%H%M)
@@ -35,6 +43,7 @@ jobs:
             gmgsi_lw.nc
             clouds_src.png
             polar_K.npy
+            /tmp/clouds_src_raw.png
           retention-days: 14
           if-no-files-found: warn
       - name: Prune old date dirs (keep latest 4)
