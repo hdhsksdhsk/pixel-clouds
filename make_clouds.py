@@ -50,6 +50,22 @@ def main():
     lo, hi = np.percentile(data[valid], [3, 97])
     norm = np.clip((data - lo)/(hi-lo+1e-6), 0, 1)
     cloud = np.power(norm, 1.6) * 255
+    # --- merc patch --- GMGSIはメルカトル。行を緯度に線形な並びへ直してから縮める
+    _lat = np.asarray(ds.variables["lat"][:, 0], np.float64)
+    _N = _lat.size
+    _tgt = np.linspace(_lat[0], _lat[-1], _N)
+    _f = np.interp(_tgt, _lat[::-1], np.arange(_N, dtype=np.float64)[::-1])
+    _r0 = np.clip(np.floor(_f).astype(int), 0, _N - 2)
+    _w = (_f - _r0)[:, None].astype(np.float32)
+
+    def _merc_rows(a):
+        return a[_r0] * (1 - _w) + a[_r0 + 1] * _w
+
+    _cv = _merc_rows(cloud * gm_valid_raw)
+    gm_valid_raw = _merc_rows(gm_valid_raw)
+    cloud = _cv / np.maximum(gm_valid_raw, 1e-3)
+    print("merc patch: 750行目 本当の緯度 %.2f度 を %.2f度 の位置へ" % (_lat[750], _tgt[750]))
+    # --- merc patch end ---
     NH = int(H * 72.7 / 90)
 
     def _rs(a):
