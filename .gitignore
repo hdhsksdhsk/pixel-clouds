@@ -13,3 +13,5 @@ test_*/
 clouds_src.png
 polar_K.npy
 polar_compare.png
+
+__pycache__/

@@ -12,8 +12,8 @@ jobs:
   update:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install deps
@@ -36,7 +36,7 @@ jobs:
           python check_faces_diag.py --tiles "$DATE" || echo "::warning::斜め線の疑いあり($DATE) - labels に追加して確認すること"
           python -c "import json; json.dump({'baseUrl':'https://hdhsksdhsk.github.io/pixel-clouds/'+'$DATE'+'/'}, open('root.json','w'))"
       - name: Archive inputs (for reproduction)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: inputs-${{ github.run_id }}
           path: |
